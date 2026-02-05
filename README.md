@@ -10,6 +10,7 @@ A Model Context Protocol (MCP) server implementation in .NET C# that provides to
 - 📓 **OneNote** - Read and create OneNote notebooks, sections, and pages
 - 🔐 **Secure Authentication** - Interactive browser-based OAuth2 with token caching via Windows DPAPI
 - 🚀 **No App Registration** - Uses Microsoft Graph Command Line Tools well-known Client ID
+- ⚡ **Dynamic Permissions** - Automatically prompts to add missing permissions when needed
 
 ## Quick Start
 
@@ -33,7 +34,31 @@ dotnet test
 
 ### Configure Permissions
 
-Use the interactive PowerShell script to configure permissions:
+You have two options for managing permissions:
+
+#### Option 1: Dynamic Permissions (Recommended for Getting Started)
+
+Just start using the tools! When you try to use a tool that requires a permission you haven't granted:
+
+1. The server detects the missing permission
+2. You're prompted: "Would you like to add this permission?"
+3. Type 'yes' and a browser opens for consent
+4. The operation retries automatically
+
+**Example:**
+```
+User: "List my Teams channels"
+Server: Permission Required - Team.ReadBasic.All
+Server: Would you like to add this permission? (yes/no)
+User: yes
+Server: ✓ Permission added, opening browser for consent...
+```
+
+See [DYNAMIC-PERMISSIONS.md](DYNAMIC-PERMISSIONS.md) for details.
+
+#### Option 2: Batch Configuration
+
+Use the interactive PowerShell script to configure all permissions upfront:
 
 ```powershell
 .\setup-permissions.ps1

@@ -21,7 +21,9 @@ The MCP server is configured via `appsettings.json`:
   "Graph": {
     "ClientId": "14d82eec-204b-4c2f-b7e8-296a70dab67e",
     "TenantId": "organizations",
-    "Scopes": [...]
+    "Scopes": [
+      "User.Read"
+    ]
   }
 }
 ```
@@ -30,7 +32,7 @@ The MCP server is configured via `appsettings.json`:
 
 - **ClientId**: The Microsoft Graph Command Line Tools well-known Client ID (no app registration required)
 - **TenantId**: Use `"organizations"` for multi-tenant support
-- **Scopes**: Array of Microsoft Graph API permission scopes
+- **Scopes**: Array of Microsoft Graph API permission scopes (starts with just `User.Read`, others added dynamically as needed)
 
 ## Permissions Guide
 
@@ -57,11 +59,22 @@ The following table shows all available scopes, their purpose, which tools requi
 
 ### Configuring Permissions
 
-You can configure permissions in two ways:
+You can configure permissions in three ways:
 
-#### Option 1: Interactive PowerShell Script (Recommended)
+#### Option 1: Dynamic Permissions (Recommended)
 
-Run the included PowerShell script to interactively select permissions:
+**No configuration needed!** Just start using tools. When you try to use a tool that requires a permission you haven't granted:
+
+1. The server detects the missing permission
+2. Prompts you: "Would you like to add this permission?"
+3. Type 'yes' and a browser opens for consent
+4. The operation retries automatically
+
+See [DYNAMIC-PERMISSIONS.md](DYNAMIC-PERMISSIONS.md) for details.
+
+#### Option 2: Batch Configuration (PowerShell Script)
+
+If you know which permissions you need upfront, use the interactive script:
 
 ```powershell
 .\setup-permissions.ps1
@@ -73,7 +86,7 @@ The script will:
 3. Save updated scopes to `appsettings.json`
 4. Generate admin consent URL if needed
 
-#### Option 2: Manual Configuration
+#### Option 3: Manual Configuration
 
 Edit `appsettings.json` directly and add/remove scopes in the `Graph:Scopes` array.
 

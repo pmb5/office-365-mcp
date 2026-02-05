@@ -8,21 +8,22 @@ namespace Office365MCP.Auth;
 public class GraphAuthService : IGraphAuthService
 {
     private readonly IPublicClientApplication _app;
-    private readonly string[] _scopes;
+    private readonly IPermissionHelper _permissionHelper;
     private readonly ILogger<GraphAuthService> _logger;
     private MsalCacheHelper? _cacheHelper;
 
-    public GraphAuthService(IConfiguration configuration, ILogger<GraphAuthService> logger)
+    public GraphAuthService(
+        IConfiguration configuration,
+        IPermissionHelper permissionHelper,
+        ILogger<GraphAuthService> logger)
     {
         _logger = logger;
+        _permissionHelper = permissionHelper;
 
         var clientId = configuration["Graph:ClientId"]
             ?? throw new InvalidOperationException("Graph:ClientId not configured");
         var tenantId = configuration["Graph:TenantId"]
             ?? throw new InvalidOperationException("Graph:TenantId not configured");
-
-        _scopes = configuration.GetSection("Graph:Scopes").Get<string[]>()
-            ?? throw new InvalidOperationException("Graph:Scopes not configured");
 
         var authority = $"https://login.microsoftonline.com/{tenantId}";
 
@@ -58,6 +59,9 @@ public class GraphAuthService : IGraphAuthService
     {
         try
         {
+            // Get current scopes from PermissionHelper (includes defaults + dynamically added)
+            var scopes = _permissionHelper.GetCurrentScopes();
+
             var accounts = await _app.GetAccountsAsync();
             var firstAccount = accounts.FirstOrDefault();
 
@@ -65,10 +69,10 @@ public class GraphAuthService : IGraphAuthService
             {
                 try
                 {
-                    var result = await _app.AcquireTokenSilent(_scopes, firstAccount)
+                    var result = await _app.AcquireTokenSilent(scopes, firstAccount)
                         .ExecuteAsync();
 
-                    _logger.LogInformation("Token acquired silently");
+                    _logger.LogInformation("Token acquired silently with {ScopeCount} scopes", scopes.Length);
                     return result.AccessToken;
                 }
                 catch (MsalUiRequiredException)
@@ -77,11 +81,11 @@ public class GraphAuthService : IGraphAuthService
                 }
             }
 
-            var interactiveResult = await _app.AcquireTokenInteractive(_scopes)
+            var interactiveResult = await _app.AcquireTokenInteractive(scopes)
                 .WithPrompt(Prompt.SelectAccount)
                 .ExecuteAsync();
 
-            _logger.LogInformation("Token acquired interactively");
+            _logger.LogInformation("Token acquired interactively with {ScopeCount} scopes", scopes.Length);
             return interactiveResult.AccessToken;
         }
         catch (Exception ex)

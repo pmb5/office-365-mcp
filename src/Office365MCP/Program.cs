@@ -15,6 +15,7 @@ builder.Logging.ClearProviders()
     .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
 
 builder.Services.AddSingleton<IGraphAuthService, GraphAuthService>();
+builder.Services.AddSingleton<IPermissionHelper, PermissionHelper>();
 builder.Services.AddHttpClient<IGraphClientService, GraphClientService>(client =>
 {
     client.BaseAddress = new Uri("https://graph.microsoft.com/v1.0/");

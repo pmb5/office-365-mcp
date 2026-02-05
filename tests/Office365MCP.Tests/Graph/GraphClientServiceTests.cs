@@ -11,6 +11,7 @@ public class GraphClientServiceTests
 {
     private readonly HttpClient _httpClient;
     private readonly IGraphAuthService _authService;
+    private readonly IPermissionHelper _permissionHelper;
     private readonly ILogger<GraphClientService> _logger;
     private readonly GraphClientService _service;
 
@@ -21,9 +22,10 @@ public class GraphClientServiceTests
             BaseAddress = new Uri("https://graph.microsoft.com/v1.0/")
         };
         _authService = Substitute.For<IGraphAuthService>();
+        _permissionHelper = Substitute.For<IPermissionHelper>();
         _logger = Substitute.For<ILogger<GraphClientService>>();
 
-        _service = new GraphClientService(_httpClient, _authService, _logger);
+        _service = new GraphClientService(_httpClient, _authService, _permissionHelper, _logger);
     }
 
     [Fact]

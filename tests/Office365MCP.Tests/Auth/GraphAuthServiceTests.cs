@@ -8,68 +8,16 @@ namespace Office365MCP.Tests.Auth;
 
 public class GraphAuthServiceTests
 {
+    private IPermissionHelper CreateMockPermissionHelper()
+    {
+        var permissionHelper = Substitute.For<IPermissionHelper>();
+        permissionHelper.GetDefaultScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
+        permissionHelper.GetCurrentScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
+        return permissionHelper;
+    }
+
     [Fact]
     public void GraphAuthService_Implements_IGraphAuthService()
-    {
-        var inMemorySettings = new Dictionary<string, string>
-        {
-            ["Graph:ClientId"] = "test-client-id",
-            ["Graph:TenantId"] = "organizations",
-            ["Graph:Scopes:0"] = "User.Read",
-            ["Graph:Scopes:1"] = "Mail.Read"
-        };
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(inMemorySettings!)
-            .Build();
-
-        var logger = Substitute.For<ILogger<GraphAuthService>>();
-
-        var service = new GraphAuthService(configuration, logger);
-
-        Assert.IsAssignableFrom<IGraphAuthService>(service);
-    }
-
-    [Fact]
-    public void Constructor_WithMissingClientId_ThrowsException()
-    {
-        var inMemorySettings = new Dictionary<string, string>
-        {
-            ["Graph:TenantId"] = "organizations",
-            ["Graph:Scopes:0"] = "User.Read"
-        };
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(inMemorySettings!)
-            .Build();
-
-        var logger = Substitute.For<ILogger<GraphAuthService>>();
-
-        Assert.Throws<InvalidOperationException>(() =>
-            new GraphAuthService(configuration, logger));
-    }
-
-    [Fact]
-    public void Constructor_WithMissingTenantId_ThrowsException()
-    {
-        var inMemorySettings = new Dictionary<string, string>
-        {
-            ["Graph:ClientId"] = "test-client-id",
-            ["Graph:Scopes:0"] = "User.Read"
-        };
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(inMemorySettings!)
-            .Build();
-
-        var logger = Substitute.For<ILogger<GraphAuthService>>();
-
-        Assert.Throws<InvalidOperationException>(() =>
-            new GraphAuthService(configuration, logger));
-    }
-
-    [Fact]
-    public void Constructor_WithMissingScopes_ThrowsException()
     {
         var inMemorySettings = new Dictionary<string, string>
         {
@@ -81,9 +29,69 @@ public class GraphAuthServiceTests
             .AddInMemoryCollection(inMemorySettings!)
             .Build();
 
+        var permissionHelper = CreateMockPermissionHelper();
+        var logger = Substitute.For<ILogger<GraphAuthService>>();
+
+        var service = new GraphAuthService(configuration, permissionHelper, logger);
+
+        Assert.IsAssignableFrom<IGraphAuthService>(service);
+    }
+
+    [Fact]
+    public void Constructor_WithMissingClientId_ThrowsException()
+    {
+        var inMemorySettings = new Dictionary<string, string>
+        {
+            ["Graph:TenantId"] = "organizations"
+        };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings!)
+            .Build();
+
+        var permissionHelper = CreateMockPermissionHelper();
         var logger = Substitute.For<ILogger<GraphAuthService>>();
 
         Assert.Throws<InvalidOperationException>(() =>
-            new GraphAuthService(configuration, logger));
+            new GraphAuthService(configuration, permissionHelper, logger));
+    }
+
+    [Fact]
+    public void Constructor_WithMissingTenantId_ThrowsException()
+    {
+        var inMemorySettings = new Dictionary<string, string>
+        {
+            ["Graph:ClientId"] = "test-client-id"
+        };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings!)
+            .Build();
+
+        var permissionHelper = CreateMockPermissionHelper();
+        var logger = Substitute.For<ILogger<GraphAuthService>>();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new GraphAuthService(configuration, permissionHelper, logger));
+    }
+
+    [Fact]
+    public void Constructor_CreatesInstanceSuccessfully()
+    {
+        var inMemorySettings = new Dictionary<string, string>
+        {
+            ["Graph:ClientId"] = "test-client-id",
+            ["Graph:TenantId"] = "organizations"
+        };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings!)
+            .Build();
+
+        var permissionHelper = CreateMockPermissionHelper();
+        var logger = Substitute.For<ILogger<GraphAuthService>>();
+
+        var service = new GraphAuthService(configuration, permissionHelper, logger);
+        Assert.NotNull(service);
     }
 }
