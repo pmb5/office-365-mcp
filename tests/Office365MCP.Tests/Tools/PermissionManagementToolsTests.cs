@@ -10,14 +10,16 @@ namespace Office365MCP.Tests.Tools;
 public class PermissionManagementToolsTests
 {
     private readonly IPermissionHelper _mockPermissionHelper;
+    private readonly IGraphAuthService _mockAuthService;
     private readonly ILogger<PermissionManagementTools> _mockLogger;
     private readonly PermissionManagementTools _tools;
 
     public PermissionManagementToolsTests()
     {
         _mockPermissionHelper = Substitute.For<IPermissionHelper>();
+        _mockAuthService = Substitute.For<IGraphAuthService>();
         _mockLogger = Substitute.For<ILogger<PermissionManagementTools>>();
-        _tools = new PermissionManagementTools(_mockPermissionHelper, _mockLogger);
+        _tools = new PermissionManagementTools(_mockPermissionHelper, _mockAuthService, _mockLogger);
     }
 
     [Fact]
@@ -302,6 +304,42 @@ public class PermissionManagementToolsTests
 
         // Act
         var result = await _tools.GetDefaultPermissions();
+
+        // Assert
+        var json = JsonSerializer.Deserialize<JsonDocument>(result);
+        Assert.NotNull(json);
+        Assert.True(json.RootElement.TryGetProperty("error", out var errorProp));
+        Assert.Equal("Test error", errorProp.GetString());
+    }
+
+    [Fact]
+    public async Task Logout_WhenSuccessful_ClearsTokenCacheAndReturnsSuccess()
+    {
+        // Arrange
+        _mockAuthService.ClearTokenCacheAsync().Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _tools.Logout();
+
+        // Assert
+        await _mockAuthService.Received(1).ClearTokenCacheAsync();
+        var json = JsonSerializer.Deserialize<JsonDocument>(result);
+        Assert.NotNull(json);
+        Assert.True(json.RootElement.GetProperty("success").GetBoolean());
+        var message = json.RootElement.GetProperty("message").GetString();
+        Assert.Contains("Successfully logged out", message);
+        Assert.Contains("cached tokens have been cleared", message);
+    }
+
+    [Fact]
+    public async Task Logout_WhenExceptionOccurs_ReturnsErrorJson()
+    {
+        // Arrange
+        _mockAuthService.ClearTokenCacheAsync()
+            .Returns(Task.FromException(new Exception("Test error")));
+
+        // Act
+        var result = await _tools.Logout();
 
         // Assert
         var json = JsonSerializer.Deserialize<JsonDocument>(result);

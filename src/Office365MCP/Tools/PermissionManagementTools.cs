@@ -11,11 +11,16 @@ namespace Office365MCP.Tools;
 public class PermissionManagementTools
 {
     private readonly IPermissionHelper _permissionHelper;
+    private readonly IGraphAuthService _authService;
     private readonly ILogger<PermissionManagementTools> _logger;
 
-    public PermissionManagementTools(IPermissionHelper permissionHelper, ILogger<PermissionManagementTools> logger)
+    public PermissionManagementTools(
+        IPermissionHelper permissionHelper,
+        IGraphAuthService authService,
+        ILogger<PermissionManagementTools> logger)
     {
         _permissionHelper = permissionHelper;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -205,6 +210,28 @@ public class PermissionManagementTools
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get default permissions");
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
+    }
+
+    [McpServerTool, Description("Logout and clear all cached authentication tokens (forces re-authentication on next use)")]
+    public async Task<string> Logout()
+    {
+        try
+        {
+            await _authService.ClearTokenCacheAsync();
+
+            _logger.LogInformation("User logged out - token cache cleared");
+
+            return JsonSerializer.Serialize(new
+            {
+                success = true,
+                message = "Successfully logged out. All cached tokens have been cleared. You will need to authenticate again on your next request."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to logout");
             return JsonSerializer.Serialize(new { error = ex.Message });
         }
     }
