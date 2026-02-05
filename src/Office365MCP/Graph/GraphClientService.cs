@@ -9,15 +9,18 @@ public class GraphClientService : IGraphClientService
 {
     private readonly HttpClient _httpClient;
     private readonly IGraphAuthService _authService;
+    private readonly IPermissionHelper _permissionHelper;
     private readonly ILogger<GraphClientService> _logger;
 
     public GraphClientService(
         HttpClient httpClient,
         IGraphAuthService authService,
+        IPermissionHelper permissionHelper,
         ILogger<GraphClientService> logger)
     {
         _httpClient = httpClient;
         _authService = authService;
+        _permissionHelper = permissionHelper;
         _logger = logger;
     }
 
@@ -55,6 +58,21 @@ public class GraphClientService : IGraphClientService
             await _authService.ClearTokenCacheAsync();
             return await action();
         }
+        catch (InsufficientPermissionException ex)
+        {
+            _logger.LogWarning("Insufficient permissions detected");
+
+            // Prompt user to add the missing permission
+            if (await _permissionHelper.HandlePermissionErrorAsync(ex.ErrorResponse))
+            {
+                _logger.LogInformation("Permission added, retrying operation");
+                // The permission was added and token cache cleared, retry the operation
+                return await action();
+            }
+
+            // User declined or permission couldn't be added, throw the original exception
+            throw;
+        }
     }
 
     private async Task<string> SendRequestAsync(HttpRequestMessage request)
@@ -67,6 +85,20 @@ public class GraphClientService : IGraphClientService
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
             throw new UnauthorizedException();
+        }
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+
+            // Check if it's a permission error
+            if (errorContent.Contains("Insufficient privileges", StringComparison.OrdinalIgnoreCase) ||
+                errorContent.Contains("Authorization_RequestDenied", StringComparison.OrdinalIgnoreCase) ||
+                errorContent.Contains("Access is denied", StringComparison.OrdinalIgnoreCase) ||
+                errorContent.Contains("does not have permission", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InsufficientPermissionException(errorContent);
+            }
         }
 
         response.EnsureSuccessStatusCode();
@@ -88,5 +120,16 @@ public class GraphClientService : IGraphClientService
 
     private class UnauthorizedException : Exception
     {
+    }
+
+    private class InsufficientPermissionException : Exception
+    {
+        public string ErrorResponse { get; }
+
+        public InsufficientPermissionException(string errorResponse)
+            : base("Insufficient permissions")
+        {
+            ErrorResponse = errorResponse;
+        }
     }
 }
