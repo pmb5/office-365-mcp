@@ -25,6 +25,7 @@ builder.Services.AddSingleton<OutlookMailTools>();
 builder.Services.AddSingleton<OutlookCalendarTools>();
 builder.Services.AddSingleton<TeamsTools>();
 builder.Services.AddSingleton<OneNoteTools>();
+builder.Services.AddSingleton<PermissionManagementTools>();
 
 builder.Services
     .AddMcpServer()

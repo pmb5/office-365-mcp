@@ -9,6 +9,9 @@ public interface IPermissionHelper
     Task<bool> HandlePermissionErrorAsync(string errorResponse);
     string[] GetDefaultScopes();
     string[] GetCurrentScopes();
+    PermissionChangeHistory GetChangeHistory();
+    Task<bool> RevertPermissionAsync(string permission);
+    Task<bool> RevertAllDynamicPermissionsAsync();
 }
 
 public class PermissionHelper : IPermissionHelper
@@ -16,6 +19,7 @@ public class PermissionHelper : IPermissionHelper
     private readonly IGraphAuthService _authService;
     private readonly ILogger<PermissionHelper> _logger;
     private readonly string _configPath;
+    private readonly string _trackingPath;
 
     // Default permissions granted on first startup (basic read access across all services)
     private static readonly string[] DefaultPermissions = new[]
@@ -76,6 +80,13 @@ public class PermissionHelper : IPermissionHelper
 
         var basePath = AppContext.BaseDirectory;
         _configPath = Path.Combine(basePath, "appsettings.json");
+
+        // Store tracking file in the same location as token cache
+        var trackingFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Office365MCP");
+        Directory.CreateDirectory(trackingFolder);
+        _trackingPath = Path.Combine(trackingFolder, "permission-changes.json");
     }
 
     public string[] GetDefaultScopes()
@@ -119,6 +130,202 @@ public class PermissionHelper : IPermissionHelper
             _logger.LogWarning(ex, "Failed to read scopes from config, using defaults");
             return DefaultPermissions;
         }
+    }
+
+    public PermissionChangeHistory GetChangeHistory()
+    {
+        try
+        {
+            if (!File.Exists(_trackingPath))
+            {
+                return new PermissionChangeHistory();
+            }
+
+            var json = File.ReadAllText(_trackingPath);
+            var history = JsonSerializer.Deserialize<PermissionChangeHistory>(json);
+            return history ?? new PermissionChangeHistory();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read permission change history");
+            return new PermissionChangeHistory();
+        }
+    }
+
+    public async Task<bool> RevertPermissionAsync(string permission)
+    {
+        try
+        {
+            // Check if permission is in defaults (can't revert defaults)
+            if (DefaultPermissions.Contains(permission))
+            {
+                _logger.LogWarning("Cannot revert default permission: {Permission}", permission);
+                await Console.Error.WriteLineAsync($"  ✗ Cannot revert '{permission}' - it's a default permission");
+                return false;
+            }
+
+            // Remove from config
+            await RemovePermissionFromConfigAsync(permission);
+
+            // Mark as reverted in tracking
+            await TrackPermissionChange(permission, "Reverted by user", isRevert: true);
+
+            // Clear token cache
+            await _authService.ClearTokenCacheAsync();
+
+            _logger.LogInformation("Reverted permission {Permission}", permission);
+            await Console.Error.WriteLineAsync($"  ✓ Permission '{permission}' reverted");
+            await Console.Error.WriteLineAsync("  ✓ Token cache cleared");
+            await Console.Error.WriteLineAsync("  → Please restart any operations. New tokens will be acquired without this permission.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to revert permission {Permission}", permission);
+            await Console.Error.WriteLineAsync($"  ✗ Error reverting permission: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> RevertAllDynamicPermissionsAsync()
+    {
+        try
+        {
+            var currentScopes = GetCurrentScopes();
+            var dynamicPermissions = currentScopes.Except(DefaultPermissions).ToList();
+
+            if (dynamicPermissions.Count == 0)
+            {
+                await Console.Error.WriteLineAsync("  ℹ No dynamic permissions to revert. Only default permissions are active.");
+                return true;
+            }
+
+            await Console.Error.WriteLineAsync($"  Found {dynamicPermissions.Count} dynamic permission(s) to revert:");
+            foreach (var perm in dynamicPermissions)
+            {
+                await Console.Error.WriteLineAsync($"    - {perm}");
+            }
+
+            // Remove all dynamic permissions from config
+            foreach (var permission in dynamicPermissions)
+            {
+                await RemovePermissionFromConfigAsync(permission);
+                await TrackPermissionChange(permission, "Reverted with all dynamic permissions", isRevert: true);
+            }
+
+            // Clear token cache
+            await _authService.ClearTokenCacheAsync();
+
+            _logger.LogInformation("Reverted {Count} dynamic permissions", dynamicPermissions.Count);
+            await Console.Error.WriteLineAsync("");
+            await Console.Error.WriteLineAsync($"  ✓ Reverted {dynamicPermissions.Count} permission(s)");
+            await Console.Error.WriteLineAsync("  ✓ Token cache cleared");
+            await Console.Error.WriteLineAsync("  → Server reset to default permissions only");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to revert dynamic permissions");
+            await Console.Error.WriteLineAsync($"  ✗ Error: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task TrackPermissionChange(string permission, string reason, bool isRevert = false)
+    {
+        try
+        {
+            var history = GetChangeHistory();
+
+            var change = new PermissionChange
+            {
+                Permission = permission,
+                Timestamp = DateTime.UtcNow,
+                Reason = reason,
+                AddedBy = "MCP Server",
+                IsReverted = isRevert
+            };
+
+            history.Changes.Add(change);
+            history.LastModified = DateTime.UtcNow;
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var json = JsonSerializer.Serialize(history, options);
+            await File.WriteAllTextAsync(_trackingPath, json);
+
+            _logger.LogInformation("Tracked permission change: {Permission} - {Reason}", permission, reason);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to track permission change for {Permission}", permission);
+        }
+    }
+
+    private async Task RemovePermissionFromConfigAsync(string permission)
+    {
+        if (!File.Exists(_configPath))
+        {
+            return;
+        }
+
+        var json = await File.ReadAllTextAsync(_configPath);
+        using var doc = JsonDocument.Parse(json);
+
+        var config = new Dictionary<string, object>();
+
+        foreach (var property in doc.RootElement.EnumerateObject())
+        {
+            if (property.Name == "Graph")
+            {
+                var graphConfig = new Dictionary<string, object>();
+
+                foreach (var graphProp in property.Value.EnumerateObject())
+                {
+                    if (graphProp.Name == "Scopes")
+                    {
+                        var scopes = new List<string>();
+                        foreach (var scope in graphProp.Value.EnumerateArray())
+                        {
+                            var scopeValue = scope.GetString();
+                            if (!string.IsNullOrEmpty(scopeValue) &&
+                                !scopeValue.Equals(permission, StringComparison.OrdinalIgnoreCase))
+                            {
+                                scopes.Add(scopeValue);
+                            }
+                        }
+
+                        if (scopes.Count > 0)
+                        {
+                            graphConfig["Scopes"] = scopes;
+                        }
+                    }
+                    else
+                    {
+                        var value = graphProp.Value.ValueKind == JsonValueKind.String
+                            ? graphProp.Value.GetString()!
+                            : graphProp.Value.ToString();
+                        graphConfig[graphProp.Name] = value;
+                    }
+                }
+
+                config["Graph"] = graphConfig;
+            }
+            else
+            {
+                var value = property.Value.ValueKind == JsonValueKind.String
+                    ? property.Value.GetString()!
+                    : property.Value.ToString();
+                config[property.Name] = value;
+            }
+        }
+
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        var updatedJson = JsonSerializer.Serialize(config, options);
+        await File.WriteAllTextAsync(_configPath, updatedJson);
+
+        _logger.LogInformation("Removed permission {Permission} from config", permission);
     }
 
     public async Task<bool> HandlePermissionErrorAsync(string errorResponse)
@@ -240,11 +447,15 @@ public class PermissionHelper : IPermissionHelper
             // Add permission to config
             await AddPermissionToConfigAsync(permission);
 
+            // Track this permission change
+            await TrackPermissionChange(permission, $"Added dynamically - {description}");
+
             // Clear token cache to force re-authentication
             await _authService.ClearTokenCacheAsync();
 
             await Console.Error.WriteLineAsync("");
             await Console.Error.WriteLineAsync("  ✓ Permission added to configuration");
+            await Console.Error.WriteLineAsync("  ✓ Change tracked for future reference");
             await Console.Error.WriteLineAsync("  ✓ Token cache cleared");
             await Console.Error.WriteLineAsync("  → Please retry your operation. A browser will open for consent.");
             await Console.Error.WriteLineAsync("");
