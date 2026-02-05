@@ -33,7 +33,7 @@ public class OutlookCalendarTools
                 ["$orderby"] = "start/dateTime"
             };
 
-            var response = await _graphClient.GetAsync("/me/calendarView", queryParams);
+            var response = await _graphClient.GetAsync("me/calendarView", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -49,7 +49,7 @@ public class OutlookCalendarTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/me/events/{eventId}");
+            var response = await _graphClient.GetAsync($"me/events/{eventId}");
             return response;
         }
         catch (Exception ex)
@@ -101,7 +101,7 @@ public class OutlookCalendarTools
             }
 
             var jsonBody = JsonSerializer.Serialize(eventObject);
-            var response = await _graphClient.PostAsync("/me/events", jsonBody);
+            var response = await _graphClient.PostAsync("me/events", jsonBody);
             return response;
         }
         catch (Exception ex)
@@ -116,7 +116,7 @@ public class OutlookCalendarTools
     {
         try
         {
-            var response = await _graphClient.GetAsync("/me/calendars");
+            var response = await _graphClient.GetAsync("me/calendars");
             return response;
         }
         catch (Exception ex)

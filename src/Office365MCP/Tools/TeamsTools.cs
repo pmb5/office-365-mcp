@@ -23,7 +23,7 @@ public class TeamsTools
     {
         try
         {
-            var response = await _graphClient.GetAsync("/me/joinedTeams");
+            var response = await _graphClient.GetAsync("me/joinedTeams");
             return response;
         }
         catch (Exception ex)
@@ -39,7 +39,7 @@ public class TeamsTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/teams/{teamId}/channels");
+            var response = await _graphClient.GetAsync($"teams/{teamId}/channels");
             return response;
         }
         catch (Exception ex)
@@ -62,7 +62,7 @@ public class TeamsTools
                 ["$top"] = count.ToString()
             };
 
-            var response = await _graphClient.GetAsync($"/teams/{teamId}/channels/{channelId}/messages", queryParams);
+            var response = await _graphClient.GetAsync($"teams/{teamId}/channels/{channelId}/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -87,7 +87,7 @@ public class TeamsTools
                 ["$top"] = count.ToString()
             };
 
-            var response = await _graphClient.GetAsync($"/teams/{teamId}/channels/{channelId}/messages", queryParams);
+            var response = await _graphClient.GetAsync($"teams/{teamId}/channels/{channelId}/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -122,7 +122,7 @@ public class TeamsTools
             };
 
             var jsonBody = JsonSerializer.Serialize(searchRequest);
-            var response = await _graphClient.PostAsync("/search/query", jsonBody);
+            var response = await _graphClient.PostAsync("search/query", jsonBody);
             return response;
         }
         catch (Exception ex)
@@ -150,7 +150,7 @@ public class TeamsTools
             };
 
             var jsonBody = JsonSerializer.Serialize(messageObject);
-            var response = await _graphClient.PostAsync($"/teams/{teamId}/channels/{channelId}/messages", jsonBody);
+            var response = await _graphClient.PostAsync($"teams/{teamId}/channels/{channelId}/messages", jsonBody);
             return response;
         }
         catch (Exception ex)
@@ -165,7 +165,7 @@ public class TeamsTools
     {
         try
         {
-            var response = await _graphClient.GetAsync("/me/chats");
+            var response = await _graphClient.GetAsync("me/chats");
             return response;
         }
         catch (Exception ex)
@@ -187,7 +187,7 @@ public class TeamsTools
                 ["$top"] = count.ToString()
             };
 
-            var response = await _graphClient.GetAsync($"/chats/{chatId}/messages", queryParams);
+            var response = await _graphClient.GetAsync($"chats/{chatId}/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -211,7 +211,7 @@ public class TeamsTools
                 ["$top"] = count.ToString()
             };
 
-            var response = await _graphClient.GetAsync($"/chats/{chatId}/messages", queryParams);
+            var response = await _graphClient.GetAsync($"chats/{chatId}/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -238,7 +238,7 @@ public class TeamsTools
             };
 
             var jsonBody = JsonSerializer.Serialize(messageObject);
-            var response = await _graphClient.PostAsync($"/chats/{chatId}/messages", jsonBody);
+            var response = await _graphClient.PostAsync($"chats/{chatId}/messages", jsonBody);
             return response;
         }
         catch (Exception ex)

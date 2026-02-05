@@ -31,7 +31,7 @@ public class OutlookMailTools
                 ["$orderby"] = "receivedDateTime desc"
             };
 
-            var response = await _graphClient.GetAsync("/me/messages", queryParams);
+            var response = await _graphClient.GetAsync("me/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -47,7 +47,7 @@ public class OutlookMailTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/me/messages/{messageId}");
+            var response = await _graphClient.GetAsync($"me/messages/{messageId}");
             return response;
         }
         catch (Exception ex)
@@ -72,7 +72,7 @@ public class OutlookMailTools
                 ["$orderby"] = "receivedDateTime desc"
             };
 
-            var response = await _graphClient.GetAsync("/me/messages", queryParams);
+            var response = await _graphClient.GetAsync("me/messages", queryParams);
             return response;
         }
         catch (Exception ex)
@@ -115,7 +115,7 @@ public class OutlookMailTools
             };
 
             var jsonBody = JsonSerializer.Serialize(message);
-            var response = await _graphClient.PostAsync("/me/sendMail", jsonBody);
+            var response = await _graphClient.PostAsync("me/sendMail", jsonBody);
             return JsonSerializer.Serialize(new { success = true, message = "Email sent successfully" });
         }
         catch (Exception ex)
@@ -130,7 +130,7 @@ public class OutlookMailTools
     {
         try
         {
-            var response = await _graphClient.GetAsync("/me/mailFolders");
+            var response = await _graphClient.GetAsync("me/mailFolders");
             return response;
         }
         catch (Exception ex)

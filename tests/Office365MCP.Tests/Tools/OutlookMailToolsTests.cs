@@ -36,7 +36,7 @@ public class OutlookMailToolsTests
 
         Assert.Equal(expectedResponse, result);
         await _graphClient.Received(1).GetAsync(
-            "/me/messages",
+            "me/messages",
             Arg.Is<Dictionary<string, string>>(d =>
                 d["$top"] == "10" &&
                 d.ContainsKey("$select") &&
@@ -54,7 +54,7 @@ public class OutlookMailToolsTests
 
         Assert.Equal(expectedResponse, result);
         await _graphClient.Received(1).GetAsync(
-            "/me/messages",
+            "me/messages",
             Arg.Is<Dictionary<string, string>>(d => d["$top"] == "25"));
     }
 
@@ -69,7 +69,7 @@ public class OutlookMailToolsTests
         var result = await _tools.GetEmail(messageId);
 
         Assert.Equal(expectedResponse, result);
-        await _graphClient.Received(1).GetAsync($"/me/messages/{messageId}", null);
+        await _graphClient.Received(1).GetAsync($"me/messages/{messageId}", null);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class OutlookMailToolsTests
 
         Assert.Equal(expectedResponse, result);
         await _graphClient.Received(1).GetAsync(
-            "/me/messages",
+            "me/messages",
             Arg.Is<Dictionary<string, string>>(d =>
                 d["$search"] == $"\"{query}\"" &&
                 d["$top"] == "10"));
@@ -104,7 +104,7 @@ public class OutlookMailToolsTests
 
         Assert.Contains("success", result);
         await _graphClient.Received(1).PostAsync(
-            "/me/sendMail",
+            "me/sendMail",
             Arg.Is<string>(json =>
                 json.Contains(to) &&
                 json.Contains(subject) &&
@@ -121,6 +121,6 @@ public class OutlookMailToolsTests
         var result = await _tools.ListMailFolders();
 
         Assert.Equal(expectedResponse, result);
-        await _graphClient.Received(1).GetAsync("/me/mailFolders", null);
+        await _graphClient.Received(1).GetAsync("me/mailFolders", null);
     }
 }

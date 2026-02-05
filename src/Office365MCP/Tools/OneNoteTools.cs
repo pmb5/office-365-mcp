@@ -23,7 +23,7 @@ public class OneNoteTools
     {
         try
         {
-            var response = await _graphClient.GetAsync("/me/onenote/notebooks");
+            var response = await _graphClient.GetAsync("me/onenote/notebooks");
             return response;
         }
         catch (Exception ex)
@@ -39,7 +39,7 @@ public class OneNoteTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/me/onenote/notebooks/{notebookId}/sections");
+            var response = await _graphClient.GetAsync($"me/onenote/notebooks/{notebookId}/sections");
             return response;
         }
         catch (Exception ex)
@@ -55,7 +55,7 @@ public class OneNoteTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/me/onenote/sections/{sectionId}/pages");
+            var response = await _graphClient.GetAsync($"me/onenote/sections/{sectionId}/pages");
             return response;
         }
         catch (Exception ex)
@@ -71,7 +71,7 @@ public class OneNoteTools
     {
         try
         {
-            var response = await _graphClient.GetAsync($"/me/onenote/pages/{pageId}/content");
+            var response = await _graphClient.GetAsync($"me/onenote/pages/{pageId}/content");
             return response;
         }
         catch (Exception ex)
@@ -99,7 +99,7 @@ public class OneNoteTools
   </body>
 </html>";
 
-            var response = await _graphClient.PostAsync($"/me/onenote/sections/{sectionId}/pages", html);
+            var response = await _graphClient.PostAsync($"me/onenote/sections/{sectionId}/pages", html);
             return response;
         }
         catch (Exception ex)
