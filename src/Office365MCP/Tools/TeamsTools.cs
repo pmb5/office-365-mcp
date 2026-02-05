@@ -160,17 +160,125 @@ public class TeamsTools
         }
     }
 
-    [McpServerTool, Description("List the user's chats")]
+    [McpServerTool, Description("List the user's chats with member information")]
     public async Task<string> ListChats()
     {
         try
         {
-            var response = await _graphClient.GetAsync("me/chats");
+            // Include members to see who's in each chat
+            var queryParams = new Dictionary<string, string>
+            {
+                ["$expand"] = "members"
+            };
+            var response = await _graphClient.GetAsync("me/chats", queryParams);
             return response;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to list chats");
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
+    }
+
+    [McpServerTool, Description("Search for users in the organization by name or email")]
+    public async Task<string> SearchUsers(
+        [Description("Search query - can be a full name, partial name, or email address (e.g., 'John Smith' or 'john@')")] string query,
+        [Description("Number of results to return (default: 10)")] int count = 10)
+    {
+        try
+        {
+            var queryParams = new Dictionary<string, string>
+            {
+                ["$search"] = $"\"displayName:{query}\" OR \"mail:{query}\" OR \"userPrincipalName:{query}\"",
+                ["$top"] = count.ToString(),
+                ["$select"] = "id,displayName,mail,userPrincipalName,jobTitle,department"
+            };
+
+            var response = await _graphClient.GetAsync("users", queryParams);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search users with query: {Query}", query);
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
+    }
+
+    [McpServerTool, Description("Find the one-on-one chat ID with a specific user")]
+    public async Task<string> FindChatWithUser(
+        [Description("The email address or user ID of the person you want to chat with")] string userEmailOrId)
+    {
+        try
+        {
+            // Get all chats with members expanded
+            var queryParams = new Dictionary<string, string>
+            {
+                ["$expand"] = "members",
+                ["$filter"] = "chatType eq 'oneOnOne'"
+            };
+
+            var response = await _graphClient.GetAsync("me/chats", queryParams);
+            var chatsData = JsonSerializer.Deserialize<JsonElement>(response);
+
+            if (!chatsData.TryGetProperty("value", out var chats))
+            {
+                return JsonSerializer.Serialize(new { error = "No chats found" });
+            }
+
+            // Look through each chat to find the one with the specified user
+            foreach (var chat in chats.EnumerateArray())
+            {
+                if (!chat.TryGetProperty("members", out var members))
+                    continue;
+
+                foreach (var member in members.EnumerateArray())
+                {
+                    if (!member.TryGetProperty("userId", out var userId))
+                        continue;
+
+                    var userIdStr = userId.GetString() ?? "";
+
+                    // Also check email if available
+                    var email = "";
+                    if (member.TryGetProperty("email", out var emailProp))
+                    {
+                        email = emailProp.GetString() ?? "";
+                    }
+
+                    // Match by user ID or email
+                    if (userIdStr.Equals(userEmailOrId, StringComparison.OrdinalIgnoreCase) ||
+                        email.Equals(userEmailOrId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (chat.TryGetProperty("id", out var chatId))
+                        {
+                            var displayName = "";
+                            if (member.TryGetProperty("displayName", out var displayNameProp))
+                            {
+                                displayName = displayNameProp.GetString() ?? "";
+                            }
+
+                            return JsonSerializer.Serialize(new
+                            {
+                                chatId = chatId.GetString(),
+                                displayName,
+                                email,
+                                userId = userIdStr,
+                                chatType = chat.GetProperty("chatType").GetString()
+                            });
+                        }
+                    }
+                }
+            }
+
+            return JsonSerializer.Serialize(new
+            {
+                error = $"No one-on-one chat found with user: {userEmailOrId}",
+                suggestion = "The user might not have an existing chat. You may need to start a new conversation."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to find chat with user {UserEmailOrId}", userEmailOrId);
             return JsonSerializer.Serialize(new { error = ex.Message });
         }
     }
