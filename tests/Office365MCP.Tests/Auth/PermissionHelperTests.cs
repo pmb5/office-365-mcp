@@ -10,7 +10,9 @@ namespace Office365MCP.Tests.Auth;
 public class PermissionHelperTests : IDisposable
 {
     private readonly IGraphAuthService _mockAuthService;
+    private readonly IScopeProvider _scopeProvider;
     private readonly ILogger<PermissionHelper> _mockLogger;
+    private readonly ILogger<ScopeProvider> _mockScopeLogger;
     private readonly IConfiguration _mockConfiguration;
     private readonly string _testConfigPath;
     private readonly string _testTrackingPath;
@@ -20,6 +22,7 @@ public class PermissionHelperTests : IDisposable
     {
         _mockAuthService = Substitute.For<IGraphAuthService>();
         _mockLogger = Substitute.For<ILogger<PermissionHelper>>();
+        _mockScopeLogger = Substitute.For<ILogger<ScopeProvider>>();
         _mockConfiguration = Substitute.For<IConfiguration>();
 
         // Create temporary test directory
@@ -28,6 +31,12 @@ public class PermissionHelperTests : IDisposable
 
         _testConfigPath = Path.Combine(_testDirectory, "appsettings.json");
         _testTrackingPath = Path.Combine(_testDirectory, "permission-changes.json");
+
+        // Create a real ScopeProvider configured to use the test config path
+        _scopeProvider = new ScopeProvider(_mockScopeLogger);
+        var configPathField = typeof(ScopeProvider).GetField("_configPath",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        configPathField?.SetValue(_scopeProvider, _testConfigPath);
     }
 
     public void Dispose()
@@ -42,7 +51,7 @@ public class PermissionHelperTests : IDisposable
     private PermissionHelper CreatePermissionHelper()
     {
         // Use reflection to create instance and set test paths
-        var helper = new PermissionHelper(_mockAuthService, _mockLogger);
+        var helper = new PermissionHelper(_mockAuthService, _scopeProvider, _mockLogger);
 
         var configPathField = typeof(PermissionHelper).GetField("_configPath",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

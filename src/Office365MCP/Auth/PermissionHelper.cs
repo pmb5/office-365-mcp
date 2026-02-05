@@ -17,6 +17,7 @@ public interface IPermissionHelper
 public class PermissionHelper : IPermissionHelper
 {
     private readonly IGraphAuthService _authService;
+    private readonly IScopeProvider _scopeProvider;
     private readonly ILogger<PermissionHelper> _logger;
     private readonly string _configPath;
     private readonly string _trackingPath;
@@ -73,9 +74,10 @@ public class PermissionHelper : IPermissionHelper
         ["Notes.Create"] = "Create OneNote pages"
     };
 
-    public PermissionHelper(IGraphAuthService authService, ILogger<PermissionHelper> logger)
+    public PermissionHelper(IGraphAuthService authService, IScopeProvider scopeProvider, ILogger<PermissionHelper> logger)
     {
         _authService = authService;
+        _scopeProvider = scopeProvider;
         _logger = logger;
 
         var basePath = AppContext.BaseDirectory;
@@ -91,45 +93,12 @@ public class PermissionHelper : IPermissionHelper
 
     public string[] GetDefaultScopes()
     {
-        return DefaultPermissions;
+        return _scopeProvider.GetDefaultScopes();
     }
 
     public string[] GetCurrentScopes()
     {
-        try
-        {
-            if (!File.Exists(_configPath))
-            {
-                return DefaultPermissions;
-            }
-
-            var json = File.ReadAllText(_configPath);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("Graph", out var graphElement) &&
-                graphElement.TryGetProperty("Scopes", out var scopesElement))
-            {
-                var scopes = new List<string>();
-                foreach (var scope in scopesElement.EnumerateArray())
-                {
-                    var scopeValue = scope.GetString();
-                    if (!string.IsNullOrEmpty(scopeValue))
-                    {
-                        scopes.Add(scopeValue);
-                    }
-                }
-
-                return scopes.Count > 0 ? scopes.ToArray() : DefaultPermissions;
-            }
-
-            return DefaultPermissions;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to read scopes from config, using defaults");
-            return DefaultPermissions;
-        }
+        return _scopeProvider.GetCurrentScopes();
     }
 
     public PermissionChangeHistory GetChangeHistory()

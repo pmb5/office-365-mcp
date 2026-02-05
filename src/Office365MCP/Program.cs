@@ -14,6 +14,7 @@ builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnC
 builder.Logging.ClearProviders()
     .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
 
+builder.Services.AddSingleton<IScopeProvider, ScopeProvider>();
 builder.Services.AddSingleton<IGraphAuthService, GraphAuthService>();
 builder.Services.AddSingleton<IPermissionHelper, PermissionHelper>();
 builder.Services.AddHttpClient<IGraphClientService, GraphClientService>(client =>

@@ -8,12 +8,12 @@ namespace Office365MCP.Tests.Auth;
 
 public class GraphAuthServiceTests
 {
-    private IPermissionHelper CreateMockPermissionHelper()
+    private IScopeProvider CreateMockScopeProvider()
     {
-        var permissionHelper = Substitute.For<IPermissionHelper>();
-        permissionHelper.GetDefaultScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
-        permissionHelper.GetCurrentScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
-        return permissionHelper;
+        var scopeProvider = Substitute.For<IScopeProvider>();
+        scopeProvider.GetDefaultScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
+        scopeProvider.GetCurrentScopes().Returns(new[] { "User.Read", "Mail.Read", "Calendars.Read", "Chat.Read", "Notes.Read" });
+        return scopeProvider;
     }
 
     [Fact]
@@ -29,10 +29,10 @@ public class GraphAuthServiceTests
             .AddInMemoryCollection(inMemorySettings!)
             .Build();
 
-        var permissionHelper = CreateMockPermissionHelper();
+        var scopeProvider = CreateMockScopeProvider();
         var logger = Substitute.For<ILogger<GraphAuthService>>();
 
-        var service = new GraphAuthService(configuration, permissionHelper, logger);
+        var service = new GraphAuthService(configuration, scopeProvider, logger);
 
         Assert.IsAssignableFrom<IGraphAuthService>(service);
     }
@@ -49,11 +49,11 @@ public class GraphAuthServiceTests
             .AddInMemoryCollection(inMemorySettings!)
             .Build();
 
-        var permissionHelper = CreateMockPermissionHelper();
+        var scopeProvider = CreateMockScopeProvider();
         var logger = Substitute.For<ILogger<GraphAuthService>>();
 
         Assert.Throws<InvalidOperationException>(() =>
-            new GraphAuthService(configuration, permissionHelper, logger));
+            new GraphAuthService(configuration, scopeProvider, logger));
     }
 
     [Fact]
@@ -68,11 +68,11 @@ public class GraphAuthServiceTests
             .AddInMemoryCollection(inMemorySettings!)
             .Build();
 
-        var permissionHelper = CreateMockPermissionHelper();
+        var scopeProvider = CreateMockScopeProvider();
         var logger = Substitute.For<ILogger<GraphAuthService>>();
 
         Assert.Throws<InvalidOperationException>(() =>
-            new GraphAuthService(configuration, permissionHelper, logger));
+            new GraphAuthService(configuration, scopeProvider, logger));
     }
 
     [Fact]
@@ -88,10 +88,10 @@ public class GraphAuthServiceTests
             .AddInMemoryCollection(inMemorySettings!)
             .Build();
 
-        var permissionHelper = CreateMockPermissionHelper();
+        var scopeProvider = CreateMockScopeProvider();
         var logger = Substitute.For<ILogger<GraphAuthService>>();
 
-        var service = new GraphAuthService(configuration, permissionHelper, logger);
+        var service = new GraphAuthService(configuration, scopeProvider, logger);
         Assert.NotNull(service);
     }
 }

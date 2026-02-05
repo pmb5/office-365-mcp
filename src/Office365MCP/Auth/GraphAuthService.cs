@@ -8,17 +8,17 @@ namespace Office365MCP.Auth;
 public class GraphAuthService : IGraphAuthService
 {
     private readonly IPublicClientApplication _app;
-    private readonly IPermissionHelper _permissionHelper;
+    private readonly IScopeProvider _scopeProvider;
     private readonly ILogger<GraphAuthService> _logger;
     private MsalCacheHelper? _cacheHelper;
 
     public GraphAuthService(
         IConfiguration configuration,
-        IPermissionHelper permissionHelper,
+        IScopeProvider scopeProvider,
         ILogger<GraphAuthService> logger)
     {
         _logger = logger;
-        _permissionHelper = permissionHelper;
+        _scopeProvider = scopeProvider;
 
         var clientId = configuration["Graph:ClientId"]
             ?? throw new InvalidOperationException("Graph:ClientId not configured");
@@ -59,8 +59,8 @@ public class GraphAuthService : IGraphAuthService
     {
         try
         {
-            // Get current scopes from PermissionHelper (includes defaults + dynamically added)
-            var scopes = _permissionHelper.GetCurrentScopes();
+            // Get current scopes from ScopeProvider (includes defaults + dynamically added)
+            var scopes = _scopeProvider.GetCurrentScopes();
 
             var accounts = await _app.GetAccountsAsync();
             var firstAccount = accounts.FirstOrDefault();
