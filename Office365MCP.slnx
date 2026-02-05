@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Office365MCP/Office365MCP.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Office365MCP.Tests/Office365MCP.Tests.csproj" />
+  </Folder>
+</Solution>
