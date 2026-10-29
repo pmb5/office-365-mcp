@@ -110,7 +110,7 @@ The server starts with **5 basic read permissions** that cover viewing and searc
 ### 4. Chat.Read ✅
 - **Purpose:** Teams chat and message search
 - **Grants:** Read chats and search messages
-- **Tools Enabled:** `ListChats`, `ListChatMessages`, `SearchChatMessages`
+- **Tools Enabled:** `ListChats`, `ListChatMessages`
 - **Admin Consent:** No
 - **Note:** This enables searching your own Teams chats!
 
@@ -165,43 +165,17 @@ The server starts with **5 basic read permissions** that cover viewing and searc
 6. Server ready immediately
 ```
 
-## Teams Search Verification
+## Teams Search
 
-Confirmed the app has **3 Teams search capabilities**:
+`SearchTeamsMessages` is the only Teams message search. It uses the Microsoft Search API
+(`POST /search/query`), which covers full history across chats and channels. Each hit carries
+the chat or channel it came from, so results for one conversation can be picked out from it.
 
-### 1. SearchChannelMessages ✅
-```csharp
-[McpServerTool, Description("Search messages in a specific channel")]
-public async Task<string> SearchChannelMessages(
-    [Description("The ID of the team")] string teamId,
-    [Description("The ID of the channel")] string channelId,
-    [Description("Search query")] string query,
-    [Description("Number of results to return (default: 20)")] int count = 20)
-```
-- **Requires:** `ChannelMessage.Read.All` (admin consent)
-- **Dynamically added when:** User searches in a specific channel
+Graph has no `$search` on a single chat's or channel's message list, which is why there are no
+per-chat or per-channel search tools.
 
-### 2. SearchTeamsMessages ✅
-```csharp
-[McpServerTool, Description("Search messages across all Teams channels and chats")]
-public async Task<string> SearchTeamsMessages(
-    [Description("Search query")] string query,
-    [Description("Number of results to return (default: 20)")] int count = 20)
-```
 - **Requires:** `ChannelMessage.Read.All` + `Chat.Read`
 - **Note:** `Chat.Read` is in defaults, so only `ChannelMessage.Read.All` needs adding
-- **Dynamically added when:** User searches across all Teams
-
-### 3. SearchChatMessages ✅
-```csharp
-[McpServerTool, Description("Search messages in a specific chat")]
-public async Task<string> SearchChatMessages(
-    [Description("The ID of the chat")] string chatId,
-    [Description("Search query")] string query,
-    [Description("Number of results to return (default: 20)")] int count = 20)
-```
-- **Requires:** `Chat.Read` (already in defaults!)
-- **Works immediately:** No additional permissions needed
 
 ## Benefits Summary
 

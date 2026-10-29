@@ -125,12 +125,10 @@ Add to your `claude_code_config.json`:
 - `ListJoinedTeams` - List all teams the user has joined
 - `ListChannels` - List channels in a specific team
 - `ListChannelMessages` - List recent messages in a channel
-- `SearchChannelMessages` - Search messages in a specific channel
 - `SearchTeamsMessages` - Search messages across all Teams/channels/chats
 - `SendChannelMessage` - Post a message to a channel
 - `ListChats` - List user's chats
 - `ListChatMessages` - List messages in a chat
-- `SearchChatMessages` - Search messages in a specific chat
 - `SendChatMessage` - Send a message to a chat
 
 ### OneNote

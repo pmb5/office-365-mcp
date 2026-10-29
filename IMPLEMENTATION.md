@@ -93,12 +93,10 @@ D:\code\office-365-mcp\
 - ✅ `ListJoinedTeams` - List user's teams
 - ✅ `ListChannels` - List channels in team
 - ✅ `ListChannelMessages` - List channel messages
-- ✅ `SearchChannelMessages` - Search in channel
 - ✅ `SearchTeamsMessages` - Search across all Teams
 - ✅ `SendChannelMessage` - Post to channel
 - ✅ `ListChats` - List user's chats
 - ✅ `ListChatMessages` - List chat messages
-- ✅ `SearchChatMessages` - Search in chat
 - ✅ `SendChatMessage` - Send chat message
 
 #### OneNote (5 tools)

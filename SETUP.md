@@ -49,9 +49,8 @@ The following table shows all available scopes, their purpose, which tools requi
 | `Calendars.ReadWrite` | Read and write user's calendars | `CreateCalendarEvent` | No |
 | `Team.ReadBasic.All` | Read basic team info | `ListJoinedTeams` | Yes |
 | `Channel.ReadBasic.All` | Read basic channel info | `ListChannels` | Yes |
-| `ChannelMessage.Read.All` | Read channel messages | `ListChannelMessages`, `SearchChannelMessages` | Yes |
 | `ChannelMessage.Send` | Send channel messages | `SendChannelMessage` | Yes |
-| `Chat.Read` | Read user's chats | `ListChats`, `ListChatMessages`, `SearchChatMessages` | No |
+| `Chat.Read` | Read user's chats | `ListChats`, `ListChatMessages` | No |
 | `Chat.ReadWrite` | Read and write user's chats | `SendChatMessage` | No |
 | `Notes.Read` | Read user's OneNote notebooks | `ListNotebooks`, `ListSections`, `ListPages`, `GetPageContent` | No |
 | `Notes.ReadWrite` | Read and write OneNote notebooks | All OneNote tools | No |
@@ -192,12 +191,10 @@ Add the following to your `claude_code_config.json`:
 - `ListJoinedTeams` - List user's teams
 - `ListChannels` - List channels in a team
 - `ListChannelMessages` - List messages in a channel
-- `SearchChannelMessages` - Search messages in a channel
 - `SearchTeamsMessages` - Search messages across all Teams
 - `SendChannelMessage` - Post message to a channel
 - `ListChats` - List user's chats
 - `ListChatMessages` - List messages in a chat
-- `SearchChatMessages` - Search messages in a chat
 - `SendChatMessage` - Send a chat message
 
 ### OneNote
