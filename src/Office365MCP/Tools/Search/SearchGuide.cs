@@ -27,7 +27,7 @@ public static class SearchGuide
     }
 
     // filters is null for a follow-up page, where the original filters are not known.
-    public static string Hint(IReadOnlyList<SearchHit> hits, long? total, bool moreAvailable, SearchFilters? filters)
+    public static string Hint(IReadOnlyList<SearchHit> hits, long? total, bool moreAvailable, SearchFilters? filters, int offset = 0)
     {
         if (hits.Count == 0)
         {
@@ -42,7 +42,7 @@ public static class SearchGuide
         var parts = new List<string>
         {
             total.HasValue
-                ? $"{total} matches, showing {hits.Count}."
+                ? $"{total} matches, showing {offset + 1} to {offset + hits.Count}."
                 : $"More matches exist than the {hits.Count} shown."
         };
 

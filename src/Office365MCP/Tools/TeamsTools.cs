@@ -95,12 +95,14 @@ public class TeamsTools
 
             if (nextPage != null)
             {
-                // The Search API pages by offset, so the token carries the query and where to resume.
+                // The Search API pages by offset, so the token carries the query, page size and where to resume.
                 var page = JsonSerializer.Deserialize<TeamsSearchPage>(SearchCursor.Decode(nextPage));
                 if (page == null || string.IsNullOrEmpty(page.Query))
                     throw new ArgumentException("nextPage is not a token from a previous Teams search.");
                 kql = page.Query;
                 offset = page.Offset;
+                if (page.Size > 0)
+                    count = page.Size;
             }
             else
             {
@@ -182,10 +184,10 @@ public class TeamsTools
                 total,
                 moreAvailable,
                 nextPage = moreAvailable
-                    ? SearchCursor.Encode(JsonSerializer.Serialize(new TeamsSearchPage(kql, offset + hits.Count)))
+                    ? SearchCursor.Encode(JsonSerializer.Serialize(new TeamsSearchPage(kql, offset + hits.Count, count)))
                     : null,
                 summary = SearchGuide.Summarize(hits),
-                hint = SearchGuide.Hint(hits, total, moreAvailable, filters),
+                hint = SearchGuide.Hint(hits, total, moreAvailable, filters, offset),
                 results
             }, SearchJson.Options);
         }

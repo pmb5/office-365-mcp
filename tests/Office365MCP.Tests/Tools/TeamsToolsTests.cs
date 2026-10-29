@@ -104,6 +104,6 @@ public class TeamsToolsTests
 
         await _graphClient.Received(1).PostAsync(
             "search/query",
-            Arg.Is<string>(body => body.Contains("\"queryString\":\"outage\"") && body.Contains("\"from\":2")));
+            Arg.Is<string>(body => body.Contains("\"queryString\":\"outage\"") && body.Contains("\"from\":2") && body.Contains("\"size\":2")));
     }
 }

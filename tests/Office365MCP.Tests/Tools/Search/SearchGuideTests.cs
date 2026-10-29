@@ -17,7 +17,7 @@ public class SearchGuideTests
 
         var hint = SearchGuide.Hint(hits, total: 312, moreAvailable: true, NoFilters);
 
-        Assert.Contains("312 matches, showing 4.", hint);
+        Assert.Contains("312 matches, showing 1 to 4.", hint);
         Assert.Contains("from=\"a@x.com\"", hint);
         Assert.Contains("2026-09-03 to 2026-10-02", hint);
     }
