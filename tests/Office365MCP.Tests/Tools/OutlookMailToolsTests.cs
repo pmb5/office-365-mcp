@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Office365MCP.Graph;
 using Office365MCP.Tools;
+using Office365MCP.Tools.Search;
+using System.Text.Json;
 using Xunit;
 
 namespace Office365MCP.Tests.Tools;
@@ -76,13 +78,11 @@ public class OutlookMailToolsTests
     public async Task SearchEmails_WithQuery_CallsGraphClientWithSearchParam()
     {
         var query = "from:john@example.com";
-        var expectedResponse = "{\"value\":[]}";
         _graphClient.GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>>())
-            .Returns(expectedResponse);
+            .Returns("{\"value\":[]}");
 
-        var result = await _tools.SearchEmails(query);
+        await _tools.SearchEmails(query);
 
-        Assert.Equal(expectedResponse, result);
         await _graphClient.Received(1).GetAsync(
             "me/messages",
             Arg.Is<Dictionary<string, string>>(d =>
@@ -116,6 +116,57 @@ public class OutlookMailToolsTests
             "me/messages",
             Arg.Is<Dictionary<string, string>>(d =>
                 d["$search"] == "\"subject:\\\"Your receipt from Anthropic, PBC\\\"\""));
+    }
+
+    [Fact]
+    public async Task SearchEmails_WithFilters_CombinesThemIntoOneSearch()
+    {
+        _graphClient.GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>>())
+            .Returns("{\"value\":[]}");
+
+        await _tools.SearchEmails(from: "billing@example.com", startDate: "2026-09-01", hasAttachments: true);
+
+        await _graphClient.Received(1).GetAsync(
+            "me/messages",
+            Arg.Is<Dictionary<string, string>>(d =>
+                d["$search"] == "\"from:billing@example.com AND received>=2026-09-01 AND hasattachments:true\""));
+    }
+
+    [Fact]
+    public async Task SearchEmails_WithNextLink_ReturnsTokenThatFollowsIt()
+    {
+        const string nextLink = "https://graph.microsoft.com/v1.0/me/messages?$search=x&$skiptoken=abc";
+        _graphClient.GetAsync("me/messages", Arg.Any<Dictionary<string, string>>())
+            .Returns(JsonSerializer.Serialize(new Dictionary<string, object> { ["value"] = Array.Empty<object>(), ["@odata.nextLink"] = nextLink }));
+        _graphClient.GetAsync(nextLink, null).Returns("{\"value\":[]}");
+
+        var first = JsonSerializer.Deserialize<JsonElement>(await _tools.SearchEmails("x"));
+        await _tools.SearchEmails(nextPage: first.GetProperty("nextPage").GetString());
+
+        await _graphClient.Received(1).GetAsync(nextLink, null);
+    }
+
+    [Fact]
+    public async Task SearchEmails_WithNextPageForAnotherHost_DoesNotCallGraph()
+    {
+        var token = SearchCursor.Encode("https://attacker.example.com/me/messages?x=1");
+
+        var result = await _tools.SearchEmails(nextPage: token);
+
+        Assert.Contains("error", result);
+        await _graphClient.DidNotReceive().GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>?>());
+    }
+
+    [Fact]
+    public async Task SearchEmails_PreviewWithInvisiblePadding_IsCollapsed()
+    {
+        var message = new { id = "1", bodyPreview = "Your receipt  ͏  ͏  ͏ end" };
+        _graphClient.GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>>())
+            .Returns(JsonSerializer.Serialize(new { value = new[] { message } }));
+
+        var result = JsonSerializer.Deserialize<JsonElement>(await _tools.SearchEmails("receipt"));
+
+        Assert.Equal("Your receipt end", result.GetProperty("results")[0].GetProperty("preview").GetString());
     }
 
     [Fact]

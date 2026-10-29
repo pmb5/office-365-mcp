@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 using Office365MCP.Graph;
+using Office365MCP.Tools.Search;
 
 namespace Office365MCP.Tools;
 
@@ -72,13 +73,46 @@ public class TeamsTools
         }
     }
 
-    [McpServerTool, Description("Search messages across all Teams chats and channels, including older history. Each result names the chat or channel it came from.")]
+    [McpServerTool, Description(
+        "Search messages across all Teams chats and channels, including older history. Start narrow: prefer " +
+        "the from, startDate and endDate filters over writing search syntax. Each result names the chat or " +
+        "channel it came from. Each response reports the total number of matches, who they are from, which " +
+        "dates they span, and a hint on how to narrow the search or get the next page. Follow the hint rather " +
+        "than raising count.")]
     public async Task<string> SearchTeamsMessages(
-        [Description("Search query")] string query,
-        [Description("Number of results to return (default: 20)")] int count = 20)
+        [Description("Words to find in the message. Optional when a filter is set.")] string? query = null,
+        [Description("Sender name or email address")] string? from = null,
+        [Description("Only messages sent on or after this date (yyyy-MM-dd)")] string? startDate = null,
+        [Description("Only messages sent on or before this date (yyyy-MM-dd)")] string? endDate = null,
+        [Description("Number of results per page (default: 20)")] int count = 20,
+        [Description("The nextPage token from a previous response, to get the next page of that search. Other parameters are ignored when it is set.")] string? nextPage = null)
     {
         try
         {
+            string kql;
+            int offset;
+            SearchFilters? filters = null;
+
+            if (nextPage != null)
+            {
+                // The Search API pages by offset, so the token carries the query and where to resume.
+                var page = JsonSerializer.Deserialize<TeamsSearchPage>(SearchCursor.Decode(nextPage));
+                if (page == null || string.IsNullOrEmpty(page.Query))
+                    throw new ArgumentException("nextPage is not a token from a previous Teams search.");
+                kql = page.Query;
+                offset = page.Offset;
+            }
+            else
+            {
+                kql = KqlQuery.Build(query, from, subject: null, startDate, endDate, "sent");
+                offset = 0;
+                filters = new SearchFilters(
+                    From: from != null,
+                    Subject: false,
+                    Dates: startDate != null || endDate != null,
+                    SupportsSubject: false);
+            }
+
             var searchRequest = new
             {
                 requests = new[]
@@ -88,9 +122,9 @@ public class TeamsTools
                         entityTypes = new[] { "chatMessage" },
                         query = new
                         {
-                            queryString = query
+                            queryString = kql
                         },
-                        from = 0,
+                        from = offset,
                         size = count
                     }
                 }
@@ -98,7 +132,62 @@ public class TeamsTools
 
             var jsonBody = JsonSerializer.Serialize(searchRequest);
             var response = await _graphClient.PostAsync("search/query", jsonBody);
-            return response;
+
+            var data = JsonSerializer.Deserialize<JsonElement>(response);
+            var results = new List<object>();
+            var hits = new List<SearchHit>();
+            long? total = null;
+            var moreAvailable = false;
+
+            if (data.TryGetProperty("value", out var responses) && responses.GetArrayLength() > 0
+                && responses[0].TryGetProperty("hitsContainers", out var containers) && containers.GetArrayLength() > 0)
+            {
+                var container = containers[0];
+                total = container.TryGetProperty("total", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt64() : null;
+                moreAvailable = container.TryGetProperty("moreResultsAvailable", out var more) && more.ValueKind == JsonValueKind.True;
+
+                if (container.TryGetProperty("hits", out var hitList))
+                {
+                    foreach (var hit in hitList.EnumerateArray())
+                    {
+                        if (!hit.TryGetProperty("resource", out var resource))
+                            continue;
+
+                        var name = JsonPath.GetString(resource, "from", "emailAddress", "name");
+                        var address = JsonPath.GetString(resource, "from", "emailAddress", "address");
+                        var sent = JsonPath.GetString(resource, "createdDateTime");
+                        var teamId = JsonPath.GetString(resource, "channelIdentity", "teamId");
+
+                        hits.Add(new SearchHit(name, address, DateTimeOffset.TryParse(sent, out var s) ? s : null));
+                        results.Add(new
+                        {
+                            id = JsonPath.GetString(resource, "id"),
+                            chatId = JsonPath.GetString(resource, "chatId"),
+                            // Chat hits repeat the chat ID as a channel ID; only real channels have a team.
+                            teamId,
+                            channelId = teamId != null ? JsonPath.GetString(resource, "channelIdentity", "channelId") : null,
+                            from = new { name, address },
+                            sent,
+                            summary = JsonPath.GetString(hit, "summary"),
+                            webLink = JsonPath.GetString(resource, "webLink")
+                        });
+                    }
+                }
+            }
+
+            return JsonSerializer.Serialize(new
+            {
+                query = kql,
+                returned = hits.Count,
+                total,
+                moreAvailable,
+                nextPage = moreAvailable
+                    ? SearchCursor.Encode(JsonSerializer.Serialize(new TeamsSearchPage(kql, offset + hits.Count)))
+                    : null,
+                summary = SearchGuide.Summarize(hits),
+                hint = SearchGuide.Hint(hits, total, moreAvailable, filters),
+                results
+            }, SearchJson.Options);
         }
         catch (Exception ex)
         {
