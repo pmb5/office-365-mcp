@@ -4,4 +4,5 @@ public interface IGraphClientService
 {
     Task<string> GetAsync(string endpoint, Dictionary<string, string>? queryParams = null);
     Task<string> PostAsync(string endpoint, string jsonBody);
+    Task<string> PostHtmlAsync(string endpoint, string html);
 }

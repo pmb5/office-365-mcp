@@ -64,12 +64,15 @@ public class OutlookMailTools
     {
         try
         {
+            // Graph rejects $search combined with $orderby on messages (400 Bad Request);
+            // $search results already come back newest first. Inner double quotes must be
+            // backslash-escaped, otherwise a quoted phrase in the query breaks the request.
+            var escapedQuery = query.Replace("\\", "\\\\").Replace("\"", "\\\"");
             var queryParams = new Dictionary<string, string>
             {
-                ["$search"] = $"\"{query}\"",
+                ["$search"] = $"\"{escapedQuery}\"",
                 ["$top"] = count.ToString(),
-                ["$select"] = "id,subject,from,receivedDateTime,bodyPreview,isRead",
-                ["$orderby"] = "receivedDateTime desc"
+                ["$select"] = "id,subject,from,receivedDateTime,bodyPreview,isRead"
             };
 
             var response = await _graphClient.GetAsync("me/messages", queryParams);

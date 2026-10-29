@@ -64,4 +64,69 @@ public class GraphClientServiceTests
         Assert.Contains("%24top=10", result); // $top is escaped to %24top
         Assert.Contains("%24select=id%2Csubject", result); // $select and comma are escaped
     }
+
+    private sealed class StubHandler : HttpMessageHandler
+    {
+        private readonly HttpResponseMessage _response;
+        public HttpRequestMessage? LastRequest { get; private set; }
+
+        public StubHandler(HttpResponseMessage response) => _response = response;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            return Task.FromResult(_response);
+        }
+    }
+
+    private GraphClientService CreateService(StubHandler handler)
+    {
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") };
+        _authService.GetAccessTokenAsync().Returns("token");
+        return new GraphClientService(client, _authService, _permissionHelper, _logger);
+    }
+
+    [Fact]
+    public async Task GetAsync_OnBadRequest_IncludesGraphErrorInMessage()
+    {
+        var handler = new StubHandler(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("{\"error\":{\"code\":\"BadRequest\",\"message\":\"$orderby is not supported with $search\"}}")
+        });
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => CreateService(handler).GetAsync("me/messages"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Contains("BadRequest: $orderby is not supported with $search", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetAsync_SearchOnUsers_SendsConsistencyLevelHeader()
+    {
+        var handler = new StubHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+
+        await CreateService(handler).GetAsync("users", new Dictionary<string, string> { ["$search"] = "\"displayName:x\"" });
+
+        Assert.Equal("eventual", handler.LastRequest!.Headers.GetValues("ConsistencyLevel").Single());
+    }
+
+    [Fact]
+    public async Task GetAsync_SearchOnMessages_DoesNotSendConsistencyLevelHeader()
+    {
+        var handler = new StubHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+
+        await CreateService(handler).GetAsync("me/messages", new Dictionary<string, string> { ["$search"] = "\"x\"" });
+
+        Assert.False(handler.LastRequest!.Headers.Contains("ConsistencyLevel"));
+    }
+
+    [Fact]
+    public async Task PostHtmlAsync_SendsTextHtmlContentType()
+    {
+        var handler = new StubHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+
+        await CreateService(handler).PostHtmlAsync("me/onenote/sections/s/pages", "<html></html>");
+
+        Assert.Equal("text/html", handler.LastRequest!.Content!.Headers.ContentType!.MediaType);
+    }
 }

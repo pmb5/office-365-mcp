@@ -92,14 +92,14 @@ public class OneNoteTools
             var html = $@"<!DOCTYPE html>
 <html>
   <head>
-    <title>{title}</title>
+    <title>{System.Net.WebUtility.HtmlEncode(title)}</title>
   </head>
   <body>
     {htmlContent}
   </body>
 </html>";
 
-            var response = await _graphClient.PostAsync($"me/onenote/sections/{sectionId}/pages", html);
+            var response = await _graphClient.PostHtmlAsync($"me/onenote/sections/{sectionId}/pages", html);
             return response;
         }
         catch (Exception ex)

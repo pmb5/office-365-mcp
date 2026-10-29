@@ -91,6 +91,34 @@ public class OutlookMailToolsTests
     }
 
     [Fact]
+    public async Task SearchEmails_DoesNotSendOrderBy()
+    {
+        _graphClient.GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>>())
+            .Returns("{\"value\":[]}");
+
+        await _tools.SearchEmails("receipt");
+
+        await _graphClient.Received(1).GetAsync(
+            "me/messages",
+            Arg.Is<Dictionary<string, string>>(d => !d.ContainsKey("$orderby")));
+    }
+
+    [Fact]
+    public async Task SearchEmails_WithQuotedPhrase_EscapesInnerQuotes()
+    {
+        var query = "subject:\"Your receipt from Anthropic, PBC\"";
+        _graphClient.GetAsync(Arg.Any<string>(), Arg.Any<Dictionary<string, string>>())
+            .Returns("{\"value\":[]}");
+
+        await _tools.SearchEmails(query);
+
+        await _graphClient.Received(1).GetAsync(
+            "me/messages",
+            Arg.Is<Dictionary<string, string>>(d =>
+                d["$search"] == "\"subject:\\\"Your receipt from Anthropic, PBC\\\"\""));
+    }
+
+    [Fact]
     public async Task SendEmail_WithValidParameters_CallsGraphClientPost()
     {
         var to = "recipient@example.com";

@@ -72,23 +72,16 @@ public class TeamsTools
         }
     }
 
-    [McpServerTool, Description("Search messages in a specific channel")]
+    [McpServerTool, Description("Search the most recent 200 messages in a specific channel for text in the message body or sender name. For older messages use search_teams_messages.")]
     public async Task<string> SearchChannelMessages(
         [Description("The ID of the team")] string teamId,
         [Description("The ID of the channel")] string channelId,
-        [Description("Search query")] string query,
+        [Description("Text to look for (case-insensitive)")] string query,
         [Description("Number of results to return (default: 20)")] int count = 20)
     {
         try
         {
-            var queryParams = new Dictionary<string, string>
-            {
-                ["$search"] = $"\"{query}\"",
-                ["$top"] = count.ToString()
-            };
-
-            var response = await _graphClient.GetAsync($"teams/{teamId}/channels/{channelId}/messages", queryParams);
-            return response;
+            return await FilterRecentMessagesAsync($"teams/{teamId}/channels/{channelId}/messages", query, count);
         }
         catch (Exception ex)
         {
@@ -187,9 +180,11 @@ public class TeamsTools
     {
         try
         {
+            // A double quote would end the quoted search clause early and make Graph reject the request.
+            var term = query.Replace("\"", "");
             var queryParams = new Dictionary<string, string>
             {
-                ["$search"] = $"\"displayName:{query}\" OR \"mail:{query}\" OR \"userPrincipalName:{query}\"",
+                ["$search"] = $"\"displayName:{term}\" OR \"mail:{term}\" OR \"userPrincipalName:{term}\"",
                 ["$top"] = count.ToString(),
                 ["$select"] = "id,displayName,mail,userPrincipalName,jobTitle,department"
             };
@@ -305,28 +300,72 @@ public class TeamsTools
         }
     }
 
-    [McpServerTool, Description("Search messages in a specific chat")]
+    [McpServerTool, Description("Search the most recent 200 messages in a specific chat for text in the message body or sender name. For older messages use search_teams_messages.")]
     public async Task<string> SearchChatMessages(
         [Description("The ID of the chat")] string chatId,
-        [Description("Search query")] string query,
+        [Description("Text to look for (case-insensitive)")] string query,
         [Description("Number of results to return (default: 20)")] int count = 20)
     {
         try
         {
-            var queryParams = new Dictionary<string, string>
-            {
-                ["$search"] = $"\"{query}\"",
-                ["$top"] = count.ToString()
-            };
-
-            var response = await _graphClient.GetAsync($"chats/{chatId}/messages", queryParams);
-            return response;
+            return await FilterRecentMessagesAsync($"chats/{chatId}/messages", query, count);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to search messages in chat {ChatId}", chatId);
             return JsonSerializer.Serialize(new { error = ex.Message });
         }
+    }
+
+    // Graph does not support $search on channel or chat message lists, so page through
+    // the most recent messages and match locally.
+    private async Task<string> FilterRecentMessagesAsync(string endpoint, string query, int count)
+    {
+        const int pageSize = 50;
+        const int maxPages = 4;
+
+        var matches = new List<JsonElement>();
+        string? next = endpoint;
+        var queryParams = new Dictionary<string, string> { ["$top"] = pageSize.ToString() };
+
+        for (var page = 0; page < maxPages && next != null && matches.Count < count; page++)
+        {
+            // nextLink already carries its own query string.
+            var response = await _graphClient.GetAsync(next, page == 0 ? queryParams : null);
+            var data = JsonSerializer.Deserialize<JsonElement>(response);
+
+            if (data.TryGetProperty("value", out var messages))
+            {
+                foreach (var message in messages.EnumerateArray())
+                {
+                    if (MessageMatches(message, query))
+                    {
+                        matches.Add(message.Clone());
+                        if (matches.Count == count)
+                            break;
+                    }
+                }
+            }
+
+            next = data.TryGetProperty("@odata.nextLink", out var link) ? link.GetString() : null;
+        }
+
+        return JsonSerializer.Serialize(new { value = matches });
+    }
+
+    private static bool MessageMatches(JsonElement message, string query)
+    {
+        var body = message.TryGetProperty("body", out var b) && b.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String
+            ? c.GetString()
+            : null;
+        var sender = message.TryGetProperty("from", out var f) && f.ValueKind == JsonValueKind.Object
+            && f.TryGetProperty("user", out var u) && u.ValueKind == JsonValueKind.Object
+            && u.TryGetProperty("displayName", out var n) && n.ValueKind == JsonValueKind.String
+            ? n.GetString()
+            : null;
+
+        return (body?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (sender?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
     [McpServerTool, Description("Send a message to a chat")]

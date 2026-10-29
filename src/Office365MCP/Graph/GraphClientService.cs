@@ -30,21 +30,45 @@ public class GraphClientService : IGraphClientService
         return await ExecuteWithRetryAsync(async () =>
         {
             var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (RequiresEventualConsistency(endpoint, queryParams))
+            {
+                request.Headers.Add("ConsistencyLevel", "eventual");
+            }
             return await SendRequestAsync(request);
         });
     }
 
-    public async Task<string> PostAsync(string endpoint, string jsonBody)
+    public Task<string> PostAsync(string endpoint, string jsonBody)
+    {
+        return PostContentAsync(endpoint, jsonBody, "application/json");
+    }
+
+    public Task<string> PostHtmlAsync(string endpoint, string html)
+    {
+        return PostContentAsync(endpoint, html, "text/html");
+    }
+
+    private async Task<string> PostContentAsync(string endpoint, string body, string mediaType)
     {
         return await ExecuteWithRetryAsync(async () =>
         {
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
             {
-                Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
+                Content = new StringContent(body, Encoding.UTF8, mediaType)
             };
             return await SendRequestAsync(request);
         });
     }
+
+    // Directory objects only accept $search with this header; other resources reject or ignore it.
+    private static bool RequiresEventualConsistency(string endpoint, Dictionary<string, string>? queryParams)
+    {
+        return queryParams != null
+            && queryParams.ContainsKey("$search")
+            && DirectoryResources.Any(r => endpoint.TrimStart('/').StartsWith(r, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly string[] DirectoryResources = { "users", "groups", "devices", "applications", "servicePrincipals" };
 
     private async Task<string> ExecuteWithRetryAsync(Func<Task<string>> action)
     {
@@ -101,8 +125,34 @@ public class GraphClientService : IGraphClientService
             }
         }
 
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            // Graph explains a rejected request in the body; without it a bad query only shows as "400".
+            throw new HttpRequestException(
+                $"Graph returned {(int)response.StatusCode} ({response.ReasonPhrase}): {DescribeGraphError(content)}",
+                null,
+                response.StatusCode);
+        }
+        return content;
+    }
+
+    private static string DescribeGraphError(string content)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(content);
+            if (doc.RootElement.TryGetProperty("error", out var error))
+            {
+                var code = error.TryGetProperty("code", out var c) ? c.GetString() : null;
+                var message = error.TryGetProperty("message", out var m) ? m.GetString() : null;
+                return string.IsNullOrEmpty(code) ? message ?? content : $"{code}: {message}";
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+        return string.IsNullOrWhiteSpace(content) ? "no details" : content;
     }
 
     private static string BuildUrl(string endpoint, Dictionary<string, string>? queryParams)
